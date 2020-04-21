@@ -1,0 +1,144 @@
+# # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# = = = = = = = Variables initialization = = = = = = =
+# # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+variable "example_vm_name" {
+    default = ""
+}
+variable "example_template_name" {
+  default = ""
+}
+variable "example_vm_ram" {
+  default = ""
+}
+variable "example_vm_cpu" {
+  default = 
+}
+variable "example_vm_cpu_per_socket" {
+  default = ""
+}
+variable "example_user_name" {
+  default = ""
+}
+variable "example_storage" {
+  default = ""
+}
+variable "example_vsphere_folder" {
+  default = ""
+}
+
+variable "example_vsphere_resource_pool" {
+  default = ""
+}
+
+variable "example_network" {
+  default = ""
+}
+
+variable "iops_limit" {
+  default = ""
+}
+     
+
+# # # # # # # # # # # # # # # # # # # # # # # # #
+# = = = = = = = Provider initialization = = = = = 
+# # # # # # # # # # # # # # # # # # # # # # # # #
+
+# Configure the VMware vSphere Provider
+provider "vsphere" {
+  user                  = ""
+  password              = ""
+  vsphere_server        = ""
+
+  # If you have a self-signed cert
+  allow_unverified_ssl = true
+}
+
+# # # # # # # # # # # # # # # # # # # # # # # # #
+# = = = = = = = Data initialization = = = = = = =
+# # # # # # # # # # # # # # # # # # # # # # # # #
+
+data "vsphere_datacenter" "dc" {
+  name = ""
+}
+data "vsphere_network" "network" {
+  name          = "${var.example_network}"
+  datacenter_id = "${data.vsphere_datacenter.dc.id}"
+}
+data "vsphere_resource_pool" "pool" {
+  name          = "${var.example_vsphere_resource_pool}"
+  datacenter_id = "${data.vsphere_datacenter.dc.id}"
+}
+
+data "vsphere_virtual_machine" "template" {
+    name = "${var.example_template_name}"
+    datacenter_id = "${data.vsphere_datacenter.dc.id}"
+}
+
+data "vsphere_datastore" "datastore" {
+  name          = "${var.example_storage}"
+  datacenter_id = "${data.vsphere_datacenter.dc.id}"
+}
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # 
+# = = = = = = = Create Resources = = = = = = =
+# # # # # # # # # # # # # # # # # # # # # # # #
+
+# Create folder not in use
+# resource "vsphere_folder" "folder" {
+#   path          = ""
+#   type          = "vm"
+#   datacenter_id = "${data.vsphere_datacenter.dc.id}"
+# }
+
+# Create virtual machine
+resource "vsphere_virtual_machine" "vm" {
+  name              = "${var.example_vm_name}"
+  resource_pool_id  = "${data.vsphere_resource_pool.pool.id}"
+  #datastore_id      = "${data.vsphere_datastore.datastore.id}"
+  folder            = "${var.example_vsphere_folder}"
+  guest_id          = "${data.vsphere_virtual_machine.template.guest_id}"
+  num_cpus          = "${var.example_vm_cpu}"
+  num_cores_per_socket = "${var.example_vm_cpu_per_socket}"
+  memory            = "${var.example_vm_ram}"
+  scsi_type         = "${data.vsphere_virtual_machine.template.scsi_type}"
+  wait_for_guest_net_timeout = 15
+  #host_system_id    = "${data.vsphere_host.host.id}"
+  firmware = "${data.vsphere_virtual_machine.template.firmware}"
+
+
+ 
+# Name disks
+   dynamic "disk" {
+    for_each = [for s in data.vsphere_virtual_machine.template.disks: {  
+      label =  index(data.vsphere_virtual_machine.template.disks, s)
+      unit_number =  index(data.vsphere_virtual_machine.template.disks, s)
+      size = s.size
+      eagerly_scrub = s.eagerly_scrub
+      thin_provisioned = contains(keys(s),"thin_provisioned") ? s.thin_provisioned : "true"
+    }]
+    content {
+      label = disk.value.label
+      unit_number = disk.value.unit_number
+      size = disk.value.size
+      datastore_id = "${data.vsphere_datastore.datastore.id}"
+      eagerly_scrub = disk.value.eagerly_scrub 
+      thin_provisioned = disk.value.thin_provisioned
+      io_limit = "${var.iops_limit == "unlimited" ? null : var.iops_limit}" 
+    }
+  } 
+
+  clone {
+    template_uuid = "${data.vsphere_virtual_machine.template.id}"
+    linked_clone  = true
+  }
+
+  network_interface {
+    network_id = "${data.vsphere_network.network.id}"
+  }
+}  
+
+output "Network" {
+ value = "${vsphere_virtual_machine.vm.*.network_interface}"
+}
