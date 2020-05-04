@@ -5,7 +5,9 @@ bla
 #-------------------- Main ---------------------------
 import boto3
 def lambda_handler(event, context):
-
+#-------------------- Main ---------------------------
+import boto3
+def lambda_handler(event, context):
     #-------------------- Debug ---------------------------
     print( 'Hello  {}'.format(event))
     
