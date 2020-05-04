@@ -1,9 +1,5 @@
 # metirials
-bla
 '''
-'''
-#-------------------- Main ---------------------------
-import boto3
 def lambda_handler(event, context):
 #-------------------- Main ---------------------------
 import boto3
@@ -107,4 +103,20 @@ def lambda_handler(event, context):
           ]
       )
     #print(response)
-  '''  
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Stmt1588516194702",
+            "Action": [
+                "elasticloadbalancing:DeregisterTargets",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:RegisterTargets"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ]
+}
+'''  
